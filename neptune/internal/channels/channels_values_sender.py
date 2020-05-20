@@ -16,7 +16,7 @@
 import logging
 import threading
 import time
-from collections import namedtuple
+from collections import namedtuple, deque
 from itertools import groupby
 from queue import Queue, Empty
 
@@ -28,6 +28,33 @@ from neptune.internal.channels.channels import ChannelIdWithValues, ChannelValue
 from neptune.internal.threads.neptune_thread import NeptuneThread
 
 _logger = logging.getLogger(__name__)
+
+
+time_spent_putting = 0
+put_counter = 0
+
+
+class MyQueue(object):
+    def __init__(self):
+        self.q = deque()
+        self.lock = threading.Lock()
+
+    def put(self, value):
+        with self.lock:
+            self.q.append(value)
+
+    def get_nowait(self, limit):
+        ret = []
+        count = 0
+        with self.lock:
+            while len(self.q) and count < limit:
+                ret.append(self.q.popleft())
+                count += 1
+        return ret
+
+    def empty(self):
+        with self.lock:
+            return len(self.q) == 0
 
 
 class ChannelsValuesSender(object):
@@ -47,6 +74,7 @@ class ChannelsValuesSender(object):
 
     # pylint:disable=protected-access
     def send(self, channel_name, channel_type, channel_value, channel_namespace=ChannelNamespace.USER):
+        global time_spent_putting, put_counter
         # Before taking the lock here, we need to check if the sending thread is not running yet.
         # Otherwise, the sending thread could call send() while being join()-ed, which would result
         # in a deadlock.
@@ -63,10 +91,14 @@ class ChannelsValuesSender(object):
         if channel_name in namespaced_channel_map:
             channel_id = namespaced_channel_map[channel_name]
         else:
+            s = time.time()
             response = self._experiment._create_channel(channel_name, channel_type, channel_namespace)
             channel_id = response.id
             namespaced_channel_map[channel_name] = channel_id
+            e = time.time()
+            print('Creating channel took {}'.format(e-s))
 
+        s = time.time()
         self._values_queue.put(self._QUEUED_CHANNEL_VALUE(
             channel_id=channel_id,
             channel_name=channel_name,
@@ -74,6 +106,11 @@ class ChannelsValuesSender(object):
             channel_value=channel_value,
             channel_namespace=channel_namespace
         ))
+        e = time.time()
+        time_spent_putting += e-s
+        put_counter += 1
+        # if put_counter % 1000 == 0:
+        #     print('Put so far: {}'.format(time_spent_putting))
 
     def join(self):
         with self.__LOCK:
@@ -87,14 +124,14 @@ class ChannelsValuesSender(object):
         return self._values_queue is not None and self._sending_thread is not None and self._sending_thread.is_alive()
 
     def _start(self):
-        self._values_queue = Queue()
+        self._values_queue = MyQueue()
         self._sending_thread = ChannelsValuesSendingThread(self._experiment, self._values_queue)
         self._sending_thread.start()
 
 
 class ChannelsValuesSendingThread(NeptuneThread):
-    _SLEEP_TIME = 5
-    _MAX_VALUES_BATCH_LENGTH = 100
+    _SLEEP_TIME = .01
+    _MAX_VALUES_BATCH_LENGTH = 50000
     _MAX_IMAGE_VALUES_BATCH_SIZE = 10485760  # 10 MB
 
     def __init__(self, experiment, values_queue):
@@ -105,32 +142,23 @@ class ChannelsValuesSendingThread(NeptuneThread):
         self._values_batch = []
 
     def run(self):
+        next_send_time = time.time() + self._SLEEP_TIME
         while self.should_continue_running() or not self._values_queue.empty():
-            try:
-                sleep_start = time.time()
-                self._values_batch.append(self._values_queue.get(timeout=max(self._sleep_time, 0)))
-                self._values_queue.task_done()
-                self._sleep_time -= time.time() - sleep_start
-            except Empty:
-                self._sleep_time = 0
-
-            if self._sleep_time <= 0 \
-                    or len(self._values_batch) >= self._MAX_VALUES_BATCH_LENGTH \
-                    or sum([len(v.channel_value.y['image_value']['data']) for v in self._values_batch if
-                            v.channel_type == ChannelType.IMAGE.value]) >= self._MAX_IMAGE_VALUES_BATCH_SIZE:  # pylint:disable=line-too-long
+            current_limit = self._MAX_VALUES_BATCH_LENGTH - len(self._values_batch)
+            self._values_batch.extend(self._values_queue.get_nowait(limit=current_limit))
+            if time.time() <= next_send_time \
+                    or len(self._values_batch) >= self._MAX_VALUES_BATCH_LENGTH:
                 self._process_batch()
 
         self._process_batch()
 
     def _process_batch(self):
-        send_start = time.time()
         if self._values_batch:
             try:
                 self._send_values(self._values_batch)
                 self._values_batch = []
             except (NeptuneException, IOError) as e:
                 _logger.warning('Failed to send channel value: %s', e)
-        self._sleep_time = self._SLEEP_TIME - (time.time() - send_start)
 
     def _send_values(self, queued_channels_values):
         def get_channel_id(value):
@@ -149,9 +177,10 @@ class ChannelsValuesSendingThread(NeptuneThread):
                                                    y=queued_value.channel_value.y))
             channels_with_values.append(ChannelIdWithValues(channel_id, channel_values))
 
+        start = time.time()
         try:
-            # pylint:disable=protected-access
             self._experiment._send_channels_values(channels_with_values)
+
         except HTTPUnprocessableEntity as e:
             message = "Maximum storage limit reached"
             try:
@@ -160,3 +189,8 @@ class ChannelsValuesSendingThread(NeptuneThread):
                 _logger.warning('Failed to send channel value: %s', message)
         except (NeptuneException, IOError) as e:
             _logger.warning('Failed to send channel value: %s', e)
+        finally:
+            end = time.time()
+            number_of_values = sum([len(x.channel_values) for x in channels_with_values])
+            _logger.warning('Sending {} values took {}'.format(number_of_values, end - start))
+

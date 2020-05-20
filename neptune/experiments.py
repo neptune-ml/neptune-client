@@ -348,21 +348,8 @@ class Experiment(object):
         if not is_float(y):
             raise InvalidChannelValue(expected_type='float', actual_type=type(y).__name__)
 
-        if is_nan_or_inf(y):
-            _logger.warning(
-                'Invalid metric value: %s for channel %s. '
-                'Metrics with nan or +/-inf values will not be sent to server',
-                y,
-                log_name)
-        elif x is not None and is_nan_or_inf(x):
-            _logger.warning(
-                'Invalid metric x-coordinate: %s for channel %s. '
-                'Metrics with nan or +/-inf x-coordinates will not be sent to server',
-                x,
-                log_name)
-        else:
-            value = ChannelValue(x, dict(numeric_value=y), timestamp)
-            self._channels_values_sender.send(log_name, ChannelType.NUMERIC.value, value)
+        value = ChannelValue(x, dict(numeric_value=y), timestamp)
+        self._channels_values_sender.send(log_name, ChannelType.NUMERIC.value, value)
 
     def send_text(self, channel_name, x, y=None, timestamp=None):
         """Log text data in Neptune.
