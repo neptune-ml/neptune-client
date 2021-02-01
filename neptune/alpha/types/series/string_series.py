@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 
-from typing import TypeVar, Iterable, TYPE_CHECKING
+from typing import TypeVar, TYPE_CHECKING
 
+from neptune.alpha.internal.utils import is_collection
 from neptune.alpha.types.series.series import Series
 
 if TYPE_CHECKING:
@@ -26,8 +27,10 @@ Ret = TypeVar('Ret')
 
 class StringSeries(Series):
 
-    def __init__(self, values: Iterable[str]):
-        self._values = list(values)
+    def __init__(self, values):
+        if not is_collection(values):
+            raise TypeError("`values` is not a collection")
+        self._values = [str(value) for value in values]
 
     def accept(self, visitor: 'ValueVisitor[Ret]') -> Ret:
         return visitor.visit_string_series(self)

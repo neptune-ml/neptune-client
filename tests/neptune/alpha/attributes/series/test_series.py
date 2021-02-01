@@ -109,7 +109,7 @@ class TestSeries(TestAttributeBase):
         exp, path = self._create_experiment(processor), self._random_path()
         attr = FloatSeries(exp, path)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             attr.log(["str", 5])
         with self.assertRaises(ValueError):
             attr.log([5, 10], step=10)
@@ -142,3 +142,9 @@ class TestSeries(TestAttributeBase):
 
         def _get_clear_operation(self) -> Operation:
             return ClearFloatLog(self._path)
+
+        def _data_to_value(self, value: Iterable) -> FloatSeriesVal:
+            return FloatSeriesVal(value)
+
+        def _is_value_type(self, value) -> bool:
+            return isinstance(value, FloatSeriesVal)

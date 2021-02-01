@@ -15,8 +15,6 @@
 #
 from typing import Union
 
-from neptune.alpha.internal.utils import verify_type
-
 from neptune.alpha.internal.operation import AssignFloat
 from neptune.alpha.types.atoms.float import Float as FloatVal
 from neptune.alpha.attributes.atoms.atom import Atom
@@ -25,11 +23,11 @@ from neptune.alpha.attributes.atoms.atom import Atom
 class Float(Atom):
 
     def assign(self, value: Union[FloatVal, float, int], wait: bool = False):
-        verify_type("value", value, (FloatVal, float, int))
-        if isinstance(value, FloatVal):
-            value = value.value
+        if not isinstance(value, FloatVal):
+            value = FloatVal(value)
+
         with self._experiment.lock():
-            self._enqueue_operation(AssignFloat(self._path, value), wait)
+            self._enqueue_operation(AssignFloat(self._path, value.value), wait)
 
     def get(self) -> float:
         # pylint: disable=protected-access

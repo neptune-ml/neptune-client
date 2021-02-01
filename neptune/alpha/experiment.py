@@ -43,7 +43,8 @@ from neptune.alpha.internal.background_job import BackgroundJob
 from neptune.alpha.internal.experiment_structure import ExperimentStructure
 from neptune.alpha.internal.operation import DeleteAttribute
 from neptune.alpha.internal.operation_processors.operation_processor import OperationProcessor
-from neptune.alpha.internal.utils import verify_type, get_stream_content
+from neptune.alpha.internal.utils import verify_type, get_stream_content,\
+    is_stream, is_float, is_string, is_float_like, is_string_like
 from neptune.alpha.internal.utils.paths import parse_path
 from neptune.alpha.internal.value_to_attribute_visitor import ValueToAttributeVisitor
 from neptune.alpha.types.atoms.datetime import Datetime
@@ -112,15 +113,23 @@ class Experiment(AbstractContextManager):
                value: Union[Value, int, float, str, datetime, IOBase],
                wait: bool = False
                ) -> Attribute:
-        if isinstance(value, (int, float)):
+        if isinstance(value, Value):
+            pass
+        elif is_float(value):
             value = Float(value)
-        elif isinstance(value, str):
+        elif is_string(value):
             value = String(value)
         elif isinstance(value, datetime):
             value = Datetime(value)
-        elif isinstance(value, IOBase):
+        elif is_stream(value):
             file_content, file_name = get_stream_content(value)
             value = File(file_content=file_content, file_name=file_name)
+        elif is_float_like(value):
+            value = Float(float(value))
+        elif is_string_like(value):
+            value = String(str(value))
+        else:
+            raise TypeError("Value of unsupported type {}".format(type(value)))
         parsed_path = parse_path(path)
 
         with self._lock:
@@ -141,6 +150,7 @@ class Experiment(AbstractContextManager):
             return self._structure.set(parse_path(path), attribute)
 
     def exists(self, path: str) -> bool:
+        verify_type("path", path, str)
         return self.get_attribute(path) is not None
 
     def pop(self, path: str, wait: bool = False):

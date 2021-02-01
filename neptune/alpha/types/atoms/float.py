@@ -29,8 +29,14 @@ class Float(Atom):
 
     value: float
 
+    def __init__(self, value):
+        self.value = float(value)
+
     def accept(self, visitor: 'ValueVisitor[Ret]') -> Ret:
         return visitor.visit_float(self)
 
     def __str__(self):
         return "Float({})".format(str(self.value))
+
+    def __float__(self):
+        return self.value

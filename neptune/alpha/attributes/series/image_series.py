@@ -16,7 +16,6 @@
 
 from typing import Optional, Iterable
 
-from neptune.alpha.internal.utils import verify_type, verify_collection_type
 from neptune.alpha.types.series.image import Image
 
 from neptune.alpha.types.series.image_series import ImageSeries as ImageSeriesVal
@@ -43,8 +42,8 @@ class ImageSeries(Series[Val, Data]):
     def _get_clear_operation(self) -> Operation:
         return ClearImageLog(self._path)
 
-    def _verify_value_type(self, value) -> None:
-        verify_type("value", value, Val)
+    def _data_to_value(self, value: Iterable) -> Val:
+        return ImageSeriesVal(value)
 
-    def _verify_data_type(self, data: Iterable[Data]) -> None:
-        verify_collection_type("data", data, Image)
+    def _is_value_type(self, value) -> bool:
+        return isinstance(value, ImageSeriesVal)

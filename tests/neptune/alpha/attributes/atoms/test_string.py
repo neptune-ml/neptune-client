@@ -39,12 +39,6 @@ class TestString(TestAttributeBase):
             var.assign(value, wait=wait)
             processor.enqueue_operation.assert_called_once_with(AssignString(path, expected), wait)
 
-    def test_assign_type_error(self):
-        values = [55, None]
-        for value in values:
-            with self.assertRaises(TypeError):
-                String(MagicMock(), MagicMock()).assign(value)
-
     def test_get(self):
         exp, path = self._create_experiment(), self._random_path()
         var = String(exp, path)

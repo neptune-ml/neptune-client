@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 
-from typing import TypeVar, Iterable, TYPE_CHECKING, Optional, Union
+from typing import TypeVar, TYPE_CHECKING, Optional, Union
 
+from neptune.alpha.internal.utils import is_collection
 from neptune.alpha.types.series.series import Series
 
 if TYPE_CHECKING:
@@ -28,11 +29,13 @@ class FloatSeries(Series):
 
     # pylint: disable=redefined-builtin
     def __init__(self,
-                 values: Iterable[float],
+                 values,
                  min: Optional[Union[float, int]] = None,
                  max: Optional[Union[float, int]] = None,
                  unit: Optional[str] = None):
-        self._values = list(values)
+        if not is_collection(values):
+            raise TypeError("`values` is not a collection")
+        self._values = [float(value) for value in values]
         self._min = min
         self._max = max
         self._unit = unit

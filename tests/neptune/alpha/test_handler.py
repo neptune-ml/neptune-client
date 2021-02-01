@@ -16,6 +16,7 @@
 import os
 import unittest
 # pylint: disable=protected-access
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from io import StringIO, BytesIO
 from tempfile import TemporaryDirectory, NamedTemporaryFile
@@ -272,3 +273,46 @@ class TestHandler(unittest.TestCase):
         exp = init(connection_mode="debug", flush_period=0.5)
         with self.assertRaises(AttributeError):
             exp['var'].something()
+
+    def test_float_like_types(self):
+        exp = init(connection_mode="debug", flush_period=0.5)
+
+        exp.define("attr1", self.FloatLike(5))
+        self.assertEqual(exp['attr1'].get(), 5)
+        exp["attr1"] = "234"
+        self.assertEqual(exp['attr1'].get(), 234)
+        with self.assertRaises(ValueError):
+            exp["attr1"] = "234a"
+
+        exp["attr2"].assign(self.FloatLike(34))
+        self.assertEqual(exp['attr2'].get(), 34)
+        exp["attr2"].assign("555")
+        self.assertEqual(exp['attr2'].get(), 555)
+        with self.assertRaises(ValueError):
+            exp["attr2"].assign("string")
+
+        exp["attr3"].log(self.FloatLike(34))
+        self.assertEqual(exp['attr3'].get_last(), 34)
+        exp["attr3"].log(["345", self.FloatLike(34), 4, 13.])
+        self.assertEqual(exp['attr3'].get_last(), 13)
+        with self.assertRaises(ValueError):
+            exp["attr3"].log([4, "234a"])
+
+    def test_string_like_types(self):
+        exp = init(connection_mode="debug", flush_period=0.5)
+
+        exp["attr1"] = "234"
+        exp["attr1"] = self.FloatLike(12356)
+        self.assertEqual(exp['attr1'].get(), "TestHandler.FloatLike(value=12356)")
+
+        exp["attr2"].log("xxx")
+        exp["attr2"].log(["345", self.FloatLike(34), 4, 13.])
+        self.assertEqual(exp['attr2'].get_last(), "13.0")
+
+    @dataclass
+    class FloatLike:
+
+        value: float
+
+        def __float__(self):
+            return float(self.value)

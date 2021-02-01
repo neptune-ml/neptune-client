@@ -31,10 +31,6 @@ Data = TypeVar('Data')
 
 class Series(Attribute, Generic[Val, Data]):
 
-    def assign(self, value: Val, wait: bool = False) -> None:
-        self._verify_value_type(value)
-        self._assign_impl(value, wait)
-
     def clear(self, wait: bool = False) -> None:
         self._clear_impl(wait)
 
@@ -58,13 +54,17 @@ class Series(Attribute, Generic[Val, Data]):
     def _get_clear_operation(self) -> Operation:
         pass
 
-    def _verify_value_type(self, value) -> None:
+    @abc.abstractmethod
+    def _data_to_value(self, value: Iterable) -> Val:
         pass
 
-    def _verify_data_type(self, data) -> None:
+    @abc.abstractmethod
+    def _is_value_type(self, value) -> bool:
         pass
 
-    def _assign_impl(self, value: Val, wait: bool = False) -> None:
+    def assign(self, value, wait: bool = False) -> None:
+        if not self._is_value_type(value):
+            value = self._data_to_value(value)
         clear_op = self._get_clear_operation()
         config_op = self._get_config_operation_from_value(value)
         with self._experiment.lock():
@@ -85,11 +85,9 @@ class Series(Attribute, Generic[Val, Data]):
         if is_collection(value):
             if step is not None and len(value) > 1:
                 raise ValueError("Collection of values are not supported for explicitly defined 'step'.")
-            value = list(value)
+            value = self._data_to_value(value)
         else:
-            value = [value]
-
-        self._verify_data_type(value)
+            value = self._data_to_value([value])
 
         if step is not None:
             verify_type("step", step, (float, int))
@@ -99,7 +97,7 @@ class Series(Attribute, Generic[Val, Data]):
         if not timestamp:
             timestamp = time.time()
 
-        op = self._get_log_operation_from_data(value, step, timestamp)
+        op = self._get_log_operation_from_data(value.values, step, timestamp)
 
         with self._experiment.lock():
             self._enqueue_operation(op, wait)

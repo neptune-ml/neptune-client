@@ -43,7 +43,7 @@ class TestFloat(TestAttributeBase):
     def test_assign_type_error(self):
         values = ["string", None]
         for value in values:
-            with self.assertRaises(TypeError):
+            with self.assertRaises(Exception):
                 Float(MagicMock(), MagicMock()).assign(value)
 
     def test_get(self):

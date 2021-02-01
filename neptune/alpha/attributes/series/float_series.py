@@ -18,7 +18,7 @@ from typing import Union, Optional, Iterable
 
 from neptune.alpha.types.series.float_series import FloatSeries as FloatSeriesVal
 
-from neptune.alpha.internal.utils import verify_type, verify_collection_type
+from neptune.alpha.internal.utils import verify_type
 
 from neptune.alpha.internal.operation import ClearFloatLog, LogFloats, Operation, ConfigFloatSeries
 from neptune.alpha.attributes.series.series import Series
@@ -57,11 +57,11 @@ class FloatSeries(Series[Val, Data]):
     def _get_config_operation_from_value(self, value: Val) -> Optional[Operation]:
         return ConfigFloatSeries(self._path, value.min, value.max, value.unit)
 
-    def _verify_value_type(self, value) -> None:
-        verify_type("value", value, Val)
+    def _data_to_value(self, value: Iterable) -> Val:
+        return FloatSeriesVal(value)
 
-    def _verify_data_type(self, data: Iterable[Data]) -> None:
-        verify_collection_type("data", data, (float, int))
+    def _is_value_type(self, value) -> bool:
+        return isinstance(value, FloatSeriesVal)
 
     def get_last(self) -> float:
         # pylint: disable=protected-access

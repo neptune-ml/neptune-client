@@ -18,7 +18,7 @@ from io import IOBase, StringIO, BytesIO
 import logging
 import os
 from glob import glob
-from typing import Union, TypeVar, Iterable, List, Set, Optional
+from typing import Union, TypeVar, Iterable, List, Set, Optional, Any
 from neptune.internal.hardware.constants import BYTES_IN_ONE_MB
 
 T = TypeVar('T')
@@ -45,6 +45,34 @@ def verify_type(var_name: str, var, expected_type: Union[type, tuple]):
 
     if isinstance(var, IOBase) and not hasattr(var, 'read'):
         raise TypeError("{} is a stream, which does not implement read method".format(var_name))
+
+
+def is_stream(var):
+    return isinstance(var, IOBase) and hasattr(var, 'read')
+
+
+def is_float(var):
+    return isinstance(var, (float, int))
+
+
+def is_string(var):
+    return isinstance(var, str)
+
+
+def is_float_like(var):
+    try:
+        _ = float(var)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def is_string_like(var):
+    try:
+        _ = str(var)
+        return True
+    except ValueError:
+        return False
 
 
 def get_type_name(_type: Union[type, tuple]):

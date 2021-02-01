@@ -27,9 +27,9 @@ from tests.neptune.alpha.attributes.test_attribute_base import TestAttributeBase
 class TestStringSeries(TestAttributeBase):
 
     def test_assign_type_error(self):
-        values = [[5.], ["text"], [], 55, "string", None]
+        values = [[5.], ["text"], 55, "string", None]
         for value in values:
-            with self.assertRaises(TypeError):
+            with self.assertRaises(Exception):
                 ImageSeries(MagicMock(), MagicMock()).assign(value)
 
     def test_log_type_error(self):

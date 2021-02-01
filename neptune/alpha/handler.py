@@ -22,7 +22,8 @@ from neptune.alpha.attributes.series import ImageSeries
 from neptune.alpha.attributes.series.float_series import FloatSeries
 from neptune.alpha.attributes.series.string_series import StringSeries
 from neptune.alpha.attributes.sets.string_set import StringSet
-from neptune.alpha.internal.utils import verify_type, is_collection, verify_collection_type
+from neptune.alpha.internal.utils import verify_type, is_collection, verify_collection_type, is_float, is_string, \
+    is_float_like, is_string_like
 from neptune.alpha.internal.utils.paths import join_paths, parse_path
 from neptune.alpha.types.atoms.file import File
 from neptune.alpha.types.series.image import Image
@@ -52,8 +53,7 @@ class Handler:
         else:
             raise AttributeError()
 
-    def assign(self, value: Union[Value, int, float, str, datetime, IOBase], wait: bool = False) -> None:
-        verify_type("value", value, (Value, int, float, str, datetime, IOBase))
+    def assign(self, value: Union[Value, int, float, str, datetime, IOBase, dict], wait: bool = False) -> None:
         with self._experiment.lock():
             attr = self._experiment.get_attribute(self._path)
             if attr:
@@ -62,9 +62,15 @@ class Handler:
                 self._experiment.define(self._path, value, wait)
 
     def save(self, value: str, wait: bool = False) -> None:
+        verify_type("value", value, str)
         self.assign(File(file_path=value), wait)
 
     def save_files(self, value: Union[str, Iterable[str]], wait: bool = False) -> None:
+        if is_collection(value):
+            verify_collection_type("value", value, str)
+        else:
+            verify_type("value", value, str)
+
         with self._experiment.lock():
             attr = self._experiment.get_attribute(self._path)
             if not attr:
@@ -79,15 +85,13 @@ class Handler:
             step=None,
             timestamp=None,
             wait: bool = False) -> None:
-        verify_type("value", value, (int, float, str, Image, Iterable))
         verify_type("step", step, (int, float, type(None)))
-        verify_type("timestamp", step, (int, float, type(None)))
+        verify_type("timestamp", timestamp, (int, float, type(None)))
 
         with self._experiment.lock():
             attr = self._experiment.get_attribute(self._path)
             if not attr:
                 if is_collection(value):
-                    verify_collection_type("value", value, (int, float, str, Image))
                     if value:
                         first_value = next(iter(value))
                     else:
@@ -95,12 +99,19 @@ class Handler:
                 else:
                     first_value = value
 
-                if isinstance(first_value, (float, int)):
+                if is_float(first_value):
                     attr = FloatSeries(self._experiment, parse_path(self._path))
-                elif isinstance(first_value, str):
+                elif is_string(first_value):
                     attr = StringSeries(self._experiment, parse_path(self._path))
                 elif isinstance(first_value, Image):
                     attr = ImageSeries(self._experiment, parse_path(self._path))
+                elif is_float_like(first_value):
+                    attr = FloatSeries(self._experiment, parse_path(self._path))
+                elif is_string_like(first_value):
+                    attr = StringSeries(self._experiment, parse_path(self._path))
+                else:
+                    raise TypeError("Value of unsupported type {}".format(type(first_value)))
+
                 attr.log(value, step=step, timestamp=timestamp, wait=wait)
                 self._experiment.set_attribute(self._path, attr)
             else:

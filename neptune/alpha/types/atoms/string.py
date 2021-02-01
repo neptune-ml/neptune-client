@@ -29,6 +29,9 @@ class String(Atom):
 
     value: str
 
+    def __init__(self, value):
+        self.value = str(value)
+
     def accept(self, visitor: 'ValueVisitor[Ret]') -> Ret:
         return visitor.visit_string(self)
 

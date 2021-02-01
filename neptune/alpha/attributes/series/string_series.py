@@ -16,7 +16,6 @@
 
 from typing import Optional, Iterable
 
-from neptune.alpha.internal.utils import verify_type, verify_collection_type
 
 from neptune.alpha.types.series.string_series import StringSeries as StringSeriesVal
 
@@ -42,11 +41,11 @@ class StringSeries(Series[Val, Data]):
     def _get_clear_operation(self) -> Operation:
         return ClearStringLog(self._path)
 
-    def _verify_value_type(self, value) -> None:
-        verify_type("value", value, Val)
+    def _data_to_value(self, value: Iterable) -> Val:
+        return StringSeriesVal(value)
 
-    def _verify_data_type(self, data: Iterable[Data]) -> None:
-        verify_collection_type("data", data, Data)
+    def _is_value_type(self, value) -> bool:
+        return isinstance(value, StringSeriesVal)
 
     def get_last(self) -> str:
         # pylint: disable=protected-access

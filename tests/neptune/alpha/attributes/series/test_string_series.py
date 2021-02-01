@@ -27,16 +27,10 @@ from tests.neptune.alpha.attributes.test_attribute_base import TestAttributeBase
 class TestStringSeries(TestAttributeBase):
 
     def test_assign_type_error(self):
-        values = [[5.], ["text"], [], 55, "string", None]
+        values = [55, "string", None]
         for value in values:
-            with self.assertRaises(TypeError):
+            with self.assertRaises(Exception):
                 StringSeries(MagicMock(), MagicMock()).assign(value)
-
-    def test_log_type_error(self):
-        values = [[5.], [[]], ["", 5], 55, None]
-        for value in values:
-            with self.assertRaises(TypeError):
-                StringSeries(MagicMock(), MagicMock()).log(value)
 
     def test_get(self):
         exp, path = self._create_experiment(), self._random_path()
